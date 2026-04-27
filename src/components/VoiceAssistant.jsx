@@ -153,9 +153,11 @@ export default function VoiceAssistant({ onComplete, onClose }) {
     } catch (err) {
       console.error('Chat error:', err);
       if (!isMountedRef.current) return;
-      const errMsg = err && err.response && err.response.data && err.response.data.error
-        ? err.response.data.error
-        : "I'm sorry, something went wrong. Please try again.";
+      // Server returns { message, next_step, collected_data } even on 5xx — use that message if available
+      const errMsg =
+        err?.response?.data?.message ||
+        err?.response?.data?.error   ||
+        "I'm sorry, something went wrong. Please try again.";
       addMessage('ai', errMsg);
       setIsLoading(false);
       isProcessingRef.current = false;
