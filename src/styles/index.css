@@ -1281,6 +1281,11 @@ input, textarea { font-family: inherit; }
 .cm-mic-label {
   font-size: 0.75rem; font-weight: 500; color: #888;
 }
+.cm-mic-error {
+  font-size: 0.75rem; color: #c0392b; background: #fff0ee;
+  border: 1px solid #f5c6c2; border-radius: 8px;
+  padding: 7px 12px; text-align: center; line-height: 1.4;
+}
 
 /* ── Input box ── */
 .cm-input-box {

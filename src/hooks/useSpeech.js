@@ -35,11 +35,12 @@ export default function useSpeech() {
 
     synthRef.current = window.speechSynthesis;
 
+    const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
     const rec = new SpeechRecognition();
-    rec.continuous      = true;   // keep mic open so user can speak full sentences
-    rec.interimResults  = true;   // show live transcript as user speaks
-    rec.lang            = 'en-IN'; // Indian English — understands Indian accent
-    rec.maxAlternatives = 3;   // pick highest-confidence alternative
+    rec.continuous      = !isMobile; // continuous on desktop; single-utterance on mobile (more reliable on Android Chrome)
+    rec.interimResults  = true;      // show live transcript as user speaks
+    rec.lang            = 'en-IN';   // Indian English — understands Indian accent
+    rec.maxAlternatives = 3;         // pick highest-confidence alternative
 
     rec.onstart = () => {
       intentionalRef.current = false;
@@ -80,7 +81,11 @@ export default function useSpeech() {
       setIsListening(false);
       setInterimTranscript('');
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
-      setSpeechError(`Microphone error: ${e.error}`);
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
+        setSpeechError('Microphone access denied. Allow mic access in your browser settings, then reload.');
+      } else {
+        setSpeechError(`Microphone error: ${e.error}`);
+      }
     };
 
     rec.onresult = (e) => {
@@ -138,12 +143,15 @@ export default function useSpeech() {
     onResultRef.current      = onResult;
     finalTextRef.current     = '';
     shouldRestartRef.current = true;
-    intentionalRef.current   = false;
+    // Set intentional=true BEFORE abort() to prevent the onend handler from also
+    // scheduling a restart — that would race with our own 150 ms restart below.
+    intentionalRef.current   = true;
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current);
 
     try { recognitionRef.current.abort(); } catch { /* ignore */ }
 
     setTimeout(() => {
+      intentionalRef.current = false;  // restore normal onend restart behaviour
       if (shouldRestartRef.current) {
         try {
           recognitionRef.current.start();

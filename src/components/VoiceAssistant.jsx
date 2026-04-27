@@ -442,6 +442,11 @@ export default function VoiceAssistant({ onComplete, onClose }) {
             </div>
           )}
 
+          {/* Mic / speech error — shown when browser blocks microphone (e.g. permission denied on mobile) */}
+          {speechError && (
+            <div className="cm-mic-error" role="alert">⚠️ {speechError}</div>
+          )}
+
           {/* Text box */}
           <div className={`cm-input-box${isListening ? ' is-listening' : ''}`}>
             <input
