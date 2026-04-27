@@ -103,6 +103,14 @@ export default function VoiceAssistant({ onComplete, onClose }) {
         });
       }
 
+      // Build the latest merged data synchronously for use below
+      const mergedData = { ...collectedDataRef.current };
+      if (response.collected_data) {
+        Object.entries(response.collected_data).forEach(([k, v]) => {
+          if (v !== null && v !== undefined && v !== '') mergedData[k] = v;
+        });
+      }
+
       const rawAiText = response.message || "Could you say that again?";
       const nextStep  = response.next_step || 'continue';
 
@@ -137,7 +145,7 @@ export default function VoiceAssistant({ onComplete, onClose }) {
         isProcessingRef.current  = false;
         stopListening();
         if (isSupported) speak(aiText, null);
-        setEditableData({ ...collectedDataRef.current });
+        setEditableData({ ...mergedData });
         setShowConfirmation(true);
       } else {
         isProcessingRef.current = false;
