@@ -1,7 +1,21 @@
 import axios from 'axios';
 
 // Production API base URL
-const api = axios.create({ baseURL: 'https://aibotservice-uawj.vercel.app/api', timeout: 30000 });
+const api = axios.create({ baseURL: 'https://aibotservice-uawj.vercel.app/api', timeout: 60000 });
+
+// Retry once on network errors or 5xx (handles Vercel cold-start timeouts)
+api.interceptors.response.use(null, async (error) => {
+  const config = error.config;
+  if (!config || config.__retried) return Promise.reject(error);
+  const status = error.response?.status;
+  const isRetryable = !error.response || status >= 500;
+  if (isRetryable) {
+    config.__retried = true;
+    await new Promise(r => setTimeout(r, 1500));
+    return api(config);
+  }
+  return Promise.reject(error);
+});
 
 /**
  * Send a chat message to the AI backend.

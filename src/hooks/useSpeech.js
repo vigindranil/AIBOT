@@ -27,6 +27,7 @@ export default function useSpeech() {
   const finalTextRef     = useRef('');
   const shouldRestartRef = useRef(false);  // true while mic should stay open
   const intentionalRef   = useRef(false);  // true when we deliberately abort/stop
+  const isSpeakingRef    = useRef(false);  // true while TTS is outputting audio — blocks mic results
 
   // ── Initialise APIs ──────────────────────────────────────────────────────────
   useEffect(() => {
@@ -83,6 +84,8 @@ export default function useSpeech() {
     };
 
     rec.onresult = (e) => {
+      // Discard anything picked up while the bot is speaking
+      if (isSpeakingRef.current) return;
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
         if (e.results[i].isFinal) {
@@ -168,10 +171,18 @@ export default function useSpeech() {
       return;
     }
 
-    // Cancel anything currently being spoken
+    // Mark speaking immediately so the mic guard activates before cancel()
+    isSpeakingRef.current = true;
+    setIsSpeaking(true);
+
+    // Chrome bug: cancel() then immediate speak() silently fails.
+    // Cancel first, then defer speak() by one event-loop tick.
     synthRef.current.cancel();
 
     const doSpeak = () => {
+      // Resume in case Chrome paused the synth (e.g. after tab switch)
+      if (synthRef.current.paused) synthRef.current.resume();
+
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.rate   = 0.90;
       utterance.pitch  = 1.10;
@@ -198,39 +209,52 @@ export default function useSpeech() {
       const settle = () => {
         if (settled) return;
         settled = true;
+        isSpeakingRef.current = false;
         setIsSpeaking(false);
-        onEnd?.();
+        // Extra 600 ms buffer so the speaker physically finishes before mic opens
+        setTimeout(() => { onEnd?.(); }, 600);
       };
 
       let ttsStarted = false;
-      utterance.onstart = () => { ttsStarted = true; setIsSpeaking(true); };
+      utterance.onstart = () => { ttsStarted = true; };
       utterance.onend   = settle;
-      utterance.onerror = (e) => { console.warn('TTS error:', e.error); settle(); };
+      utterance.onerror = (e) => {
+        console.warn('TTS error:', e.error);
+        // 'interrupted' means we called cancel() ourselves — not a real error
+        if (e.error !== 'interrupted') settle();
+        else { isSpeakingRef.current = false; setIsSpeaking(false); }
+      };
 
       utteranceRef.current = utterance;
       synthRef.current.speak(utterance);
 
-      // Safety: Chrome blocks TTS when not triggered by a user gesture.
-      // If TTS never starts within 2.5 s, call onEnd so the flow continues.
-      setTimeout(() => { if (!ttsStarted) settle(); }, 2500);
+      // Safety: if TTS never starts within 3 s, unblock the flow
+      setTimeout(() => {
+        if (!ttsStarted) { isSpeakingRef.current = false; settle(); }
+      }, 3000);
     };
 
     // Voices may not be loaded on the first call — wait if necessary
-    if (synthRef.current.getVoices().length > 0) {
-      doSpeak();
-    } else {
-      synthRef.current.onvoiceschanged = () => {
-        synthRef.current.onvoiceschanged = null;
-        doSpeak();
-      };
-      // Fallback timeout in case onvoiceschanged never fires
-      setTimeout(() => {
-        if (!isSpeaking) doSpeak();
-      }, 500);
-    }
+    const trySpeak = () => {
+      if (synthRef.current.getVoices().length > 0) {
+        // Small delay after cancel() to avoid the Chrome silent-speak bug
+        setTimeout(doSpeak, 80);
+      } else {
+        synthRef.current.onvoiceschanged = () => {
+          synthRef.current.onvoiceschanged = null;
+          setTimeout(doSpeak, 80);
+        };
+        // Fallback if onvoiceschanged never fires
+        setTimeout(() => {
+          if (isSpeakingRef.current) doSpeak();
+        }, 500);
+      }
+    };
+    trySpeak();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const stopSpeaking = useCallback(() => {
+    isSpeakingRef.current = false;
     synthRef.current?.cancel();
     setIsSpeaking(false);
   }, []);
