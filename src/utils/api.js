@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// All requests are proxied through Vite dev server → http://localhost:5000
-const api = axios.create({ baseURL: '/api', timeout: 30000 });
+// Production API base URL
+const api = axios.create({ baseURL: 'https://aibotservice-uawj.vercel.app/api', timeout: 30000 });
 
 /**
  * Send a chat message to the AI backend.
