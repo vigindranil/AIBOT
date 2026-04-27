@@ -213,6 +213,8 @@ export default function VoiceAssistant({ onComplete, onClose }) {
 
   const handleManualSend = useCallback(() => {    const text = inputText.trim();
     if (!text || isLoading) return;
+    // Unlock TTS synchronously inside the user gesture before going async
+    window.speechSynthesis?.cancel();
     setInputText('');
     handleUserInput(text);
   }, [inputText, isLoading, handleUserInput]);
@@ -298,7 +300,7 @@ export default function VoiceAssistant({ onComplete, onClose }) {
                 <button
                   key={q.text}
                   className="cm-quick-btn"
-                  onClick={() => handleUserInput(q.text)}
+                  onClick={() => { window.speechSynthesis?.cancel(); handleUserInput(q.text); }}
                 >
                   <span className="cm-quick-arrow">↗</span>
                   <span>{q.text}</span>
@@ -378,16 +380,6 @@ export default function VoiceAssistant({ onComplete, onClose }) {
                   value={editableData.city || ''}
                   onChange={e => setEditableData(d => ({ ...d, city: e.target.value }))}
                   placeholder="e.g. Mumbai"
-                />
-              </div>
-              <div className="cm-confirm-row">
-                <label>Pincode</label>
-                <input
-                  type="text"
-                  inputMode="numeric"
-                  value={editableData.pincode || ''}
-                  onChange={e => setEditableData(d => ({ ...d, pincode: e.target.value }))}
-                  placeholder="e.g. 400001"
                 />
               </div>
               <div className="cm-confirm-row">
