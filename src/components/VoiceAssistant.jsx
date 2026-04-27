@@ -9,7 +9,7 @@ import { sendMessage, saveProfile } from '../utils/api';
 const EMPTY_DATA = {
   name: null, gender: null,
   problem_type: null, problem_details: null,
-  country: null, state: null, city: null, pincode: null,
+  country: null, state: null, city: null,
   mobile: null,
 };
 
